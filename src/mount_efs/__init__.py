@@ -373,6 +373,7 @@ def get_target_region(config):
             'Warning: region obtained from "dns_name_format" field. Please set the "region" '
             "parameter in the efs-utils configuration file."
         )
+        logging.debug("[*][1]No parameter in the efs-utils configuration file")
         return region
     except Exception:
         logging.warning('Legacy check for region in "dns_name_format" failed')
@@ -396,6 +397,7 @@ def get_region_from_instance_metadata(config):
     instance_identity = get_instance_identity_info_from_instance_metadata(
         config, "region"
     )
+    logging.debug("[*][2] Success - get_region_from_instance_metadata with --> %s", instance_identity)
 
     if not instance_identity:
         raise Exception(
@@ -410,6 +412,7 @@ def get_az_from_instance_metadata(config):
     instance_identity = get_instance_identity_info_from_instance_metadata(
         config, "availabilityZone"
     )
+    logging.debug("[*][3] Success - get_az_from_instance_metadata with --> %s", instance_identity)
 
     if not instance_identity:
         raise Exception("Cannot retrieve az from instance_metadata")
@@ -432,6 +435,7 @@ def get_instance_identity_info_from_instance_metadata(config, property):
         logging.debug(
             "Instance metadata already retrieved in previous call, use the cached values."
         )
+        logging.debug("[*][4] Success - get_region_from_instance_metadata with --> %s", INSTANCE_IDENTITY)
         instance_identity = INSTANCE_IDENTITY
     else:
         instance_identity = url_request_helper(
@@ -441,6 +445,7 @@ def get_instance_identity_info_from_instance_metadata(config, property):
             ec2_metadata_url_error_msg,
         )
         INSTANCE_IDENTITY = instance_identity
+        logging.debug("[*][5] Success - url_request returned with --> %s", INSTANCE_IDENTITY)
 
     if instance_identity:
         try:
@@ -465,7 +470,9 @@ def get_region_from_legacy_dns_format(config):
     dns_name_format = config.get(CONFIG_SECTION, "dns_name_format")
     if "{region}" not in dns_name_format:
         split_dns_name_format = dns_name_format.split(".")
+        logging.debug("(1)split_dns_name_format in get_region_from_legacy_dns_format is %s", split_dns_name_format)
         if "{dns_name_suffix}" in dns_name_format:
+            logging.debug("(2) split_dns_name_format in get_region_from_legacy_dns_format is %s", split_dns_name_format)
             return split_dns_name_format[-2]
         elif "amazonaws.com" in dns_name_format:
             return split_dns_name_format[-3]
@@ -595,6 +602,7 @@ def get_aws_security_credentials(
     # through IAM role name security credentials lookup uri
     iam_role_name = get_iam_role_name(config)
     if iam_role_name:
+        logging.debug("IAM role name is %s", iam_role_name)
         (
             credentials,
             credentials_source,
@@ -648,6 +656,8 @@ def get_aws_security_credentials_from_ecs(config, aws_creds_uri, is_fatal=False)
         config, ecs_uri, ecs_unsuccessful_resp, ecs_url_error_msg
     )
 
+    logging.debug("ecs_security_dict has retrieved info of %s ", ecs_security_dict)
+
     if ecs_security_dict and all(k in ecs_security_dict for k in CREDENTIALS_KEYS):
         return ecs_security_dict, "ecs:" + aws_creds_uri
 
@@ -686,6 +696,8 @@ def get_aws_security_credentials_from_webidentity(
         )
     )
 
+    logging.debug("Retrieved webidentity_url is %s ", webidentity_url)
+
     unsuccessful_resp = (
         "Unsuccessful retrieval of AWS security credentials at %s." % STS_ENDPOINT_URL
     )
@@ -713,7 +725,7 @@ def get_aws_security_credentials_from_webidentity(
                 "SecretAccessKey": creds["SecretAccessKey"],
                 "Token": creds["SessionToken"],
             }, "webidentity:" + ",".join([role_arn, token_file])
-
+    logging.debug("Retrieved creds is : %s", creds)
     # Fail if credentials cannot be fetched from the given aws_creds_uri
     if is_fatal:
         fatal_error(unsuccessful_resp, unsuccessful_resp)
@@ -735,6 +747,8 @@ def get_aws_security_credentials_from_instance_metadata(config, iam_role_name):
         config, security_creds_lookup_url, unsuccessful_resp, url_error_msg
     )
 
+    logging.debug("iam_security_dict is %s", iam_security_dict)
+
     if iam_security_dict and all(k in iam_security_dict for k in CREDENTIALS_KEYS):
         return iam_security_dict, "metadata:"
     else:
@@ -742,6 +756,7 @@ def get_aws_security_credentials_from_instance_metadata(config, iam_role_name):
 
 
 def get_iam_role_name(config):
+    logging.debug("Retrieved config when trying to get iam role, %s and INSTANCE_IAM_URL is %s,", config, INSTANCE_IAM_URL)
     iam_role_unsuccessful_resp = (
         "Unsuccessful retrieval of IAM role name at %s." % INSTANCE_IAM_URL
     )
@@ -752,6 +767,7 @@ def get_iam_role_name(config):
     iam_role_name = url_request_helper(
         config, INSTANCE_IAM_URL, iam_role_unsuccessful_resp, iam_role_url_error_msg
     )
+    logging.debug("Retrieved iam_role_name, %s", config, iam_role_name)
     return iam_role_name
 
 
@@ -827,7 +843,7 @@ def get_aws_profile(options, use_iam):
                     return "default"
             except (NoSectionError, NoOptionError):
                 continue
-
+    logging.debug("get_aws_profile got use_iam of %s",  use_iam)          
     return awsprofile
 
 
